@@ -1,15 +1,16 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import speech_recognition as sr
+import speech
 import azure.cognitiveservices.speech as speechsdk
 import os
 from datetime import datetime
-import grammar_search
+from grammar_search import GrammarChecker
 
 app = Flask(__name__)
 CORS(app)
 
 # 配置 Azure Speech 服务
+deepinfra_key="CIKsKJJeHBT4nsqIWKHOXdDdjJEs4O2E"
 speech_key = "6RPQ7KXIBTodcoU17xo0dsdsLKZaXeQgKbMyBbGpaYpqxPcrcpxZJQQJ99BFAC3pKaRXJ3w3AAAYACOGwgQD"
 service_region = "eastasia"
 
@@ -31,6 +32,8 @@ def save_text_to_file(text):
         f.write(text)
     return filename
 
+
+
 @app.route('/api/speech', methods=['POST'])
 def speech_to_text():
     """处理语音输入"""
@@ -44,27 +47,24 @@ def speech_to_text():
         audio_path = "temp_audio.wav"
         audio_file.save(audio_path)
 
-        # 使用 Azure Speech SDK 进行识别
-        speech_config = speechsdk.SpeechConfig(subscription=speech_key, region=service_region)
-        speech_config.speech_recognition_language = "en-US"
-        audio_config = speechsdk.audio.AudioConfig(filename=audio_path)
-        speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-
-        # 进行识别
-        result = speech_recognizer.recognize_once()
-        if result.reason == speechsdk.ResultReason.RecognizedSpeech:
-            text = result.text
-            # 保存识别结果到文件
-            filename = save_text_to_file(text)
-            # 调用 grammar_search 进行处理
-            grammar_result = grammar_search.process_text(text)
-            
-            # 清理临时文件
+        text=speech.start_recognition(speech_key, service_region)
+        checker = GrammarChecker(deepinfra_key)
+    
+        # 语法检查
+        result = checker.check_grammar(text)
+        print("\nGrammar check result:")
+        print(result)
+        # 相似历史纠错
+        similar = checker.get_similar_corrections(text)
+        print("\nSimilar corrections:")
+        print(similar)
+        
+        if result['error'] == ['none']:
             os.remove(audio_path)
             
             return jsonify({
-                "text": text,
-                "grammar_result": grammar_result
+                "text": result['corrected_sentence'],
+                "grammar_result": result['explanations']
             })
         else:
             return jsonify({"error": "Speech recognition failed"}), 400
@@ -72,29 +72,29 @@ def speech_to_text():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/text', methods=['POST'])
-def process_text():
-    """处理文本输入"""
-    try:
-        data = request.get_json()
-        text = data.get('text')
+# @app.route('/api/text', methods=['POST'])
+# def process_text():
+#     """处理文本输入"""
+#     try:
+#         data = request.get_json()
+#         text = data.get('text')
         
-        if not text:
-            return jsonify({"error": "No text provided"}), 400
+#         if not text:
+#             return jsonify({"error": "No text provided"}), 400
 
-        # 保存文本到文件
-        filename = save_text_to_file(text)
+#         # 保存文本到文件
+#         filename = save_text_to_file(text)
         
-        # 调用 grammar_search 进行处理
-        grammar_result = grammar_search.process_text(text)
+#         # 调用 grammar_search 进行处理
+#         grammar_result = grammar_search.process_text(text)
         
-        return jsonify({
-            "text": text,
-            "grammar_result": grammar_result
-        })
+#         return jsonify({
+#             "text": text,
+#             "grammar_result": grammar_result
+#         })
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

@@ -1,8 +1,10 @@
+# grammar_checker.py
+
 import chromadb
 from chromadb.utils import embedding_functions
 import requests
 import json
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 class GrammarChecker:
     def __init__(self, deepinfra_api_key: str):
@@ -21,9 +23,6 @@ class GrammarChecker:
         )
 
     def check_grammar(self, sentence: str) -> Dict:
-        """
-        Check grammar of a given sentence using Meta-Llama-3-70B-Instruct model
-        """
         system_prompt = """You are a professional English grammar checker. Your task is to:
 1. Identify all grammar errors in the given sentence
 2. Provide the corrected version
@@ -52,38 +51,35 @@ You must respond in JSON format only, with the following structure:
         try:
             response = requests.post(self.api_url, headers=self.headers, json=payload)
             response.raise_for_status()
-            
+
             result = response.json()
             content = result['choices'][0]['message']['content']
-            
-            # Ensure we have valid JSON
+
+            # Ensure valid JSON
             try:
                 analysis = json.loads(content)
             except json.JSONDecodeError:
-                # If the response isn't valid JSON, try to extract JSON from the text
                 import re
                 json_match = re.search(r'\{.*\}', content, re.DOTALL)
                 if json_match:
                     analysis = json.loads(json_match.group())
                 else:
                     raise ValueError("Could not parse response as JSON")
-            
-            # Validate the response structure
+
             required_keys = ["errors", "corrected_sentence", "explanations"]
             if not all(key in analysis for key in required_keys):
                 raise ValueError("Response missing required fields")
-            
-            # Store in ChromaDB for future reference
+
+            # Store in ChromaDB
             self.collection.add(
                 documents=[sentence],
                 metadatas=[{"correction": analysis["corrected_sentence"]}],
                 ids=[f"correction_{len(self.collection.get()['ids']) + 1}"]
             )
-            
+
             return analysis
-            
+
         except requests.exceptions.RequestException as e:
-            print(f"API request failed: {str(e)}")
             return {
                 "error": f"API request failed: {str(e)}",
                 "errors": [],
@@ -91,7 +87,6 @@ You must respond in JSON format only, with the following structure:
                 "explanations": []
             }
         except Exception as e:
-            print(f"Error processing response: {str(e)}")
             return {
                 "error": f"Error processing response: {str(e)}",
                 "errors": [],
@@ -100,15 +95,12 @@ You must respond in JSON format only, with the following structure:
             }
 
     def get_similar_corrections(self, sentence: str, n_results: int = 3) -> List[Dict]:
-        """
-        Retrieve similar corrections from the database
-        """
         try:
             results = self.collection.query(
                 query_texts=[sentence],
                 n_results=n_results
             )
-            
+
             return [
                 {
                     "original": doc,
@@ -119,37 +111,3 @@ You must respond in JSON format only, with the following structure:
         except Exception as e:
             print(f"Error retrieving similar corrections: {str(e)}")
             return []
-
-def main():
-    # Replace with your actual DeepInfra API key
-    api_key = "CIKsKJJeHBT4nsqIWKHOXdDdjJEs4O2E"
-    
-    checker = GrammarChecker(api_key)
-    
-    # Example usage
-    test_sentence = "He don't know how to swim."
-    result = checker.check_grammar(test_sentence)
-    
-    print("\nOriginal sentence:", test_sentence)
-    print("\nGrammar Analysis:")
-    if "error" in result:
-        print("Error:", result["error"])
-    else:
-        print("Errors found:", result["errors"])
-        print("Corrected sentence:", result["corrected_sentence"])
-        print("\nExplanations:")
-        for exp in result["explanations"]:
-            print(f"- {exp}")
-    
-    # Get similar corrections
-    print("\nSimilar corrections from database:")
-    similar = checker.get_similar_corrections(test_sentence)
-    if similar:
-        for item in similar:
-            print(f"Original: {item['original']}")
-            print(f"Correction: {item['correction']}\n")
-    else:
-        print("No similar corrections found in database.")
-
-if __name__ == "__main__":
-    main()

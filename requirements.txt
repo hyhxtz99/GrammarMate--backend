@@ -1,0 +1,4 @@
+flask==2.0.1
+flask-cors==3.0.10
+azure-cognitiveservices-speech==1.31.0
+SpeechRecognition==3.8.1 

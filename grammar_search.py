@@ -5,6 +5,19 @@ from chromadb.utils import embedding_functions
 import requests
 import json
 from typing import Dict, List
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+class MyEmbeddingFunction:
+    def __init__(self, model):
+        self.model = model
+
+    def __call__(self, input):   # 注意这里必须叫 input！
+        return self.model.encode(input).tolist()
+
+    def name(self):
+        return "sentence-transformers-embedding"
 
 class GrammarChecker:
     def __init__(self, deepinfra_api_key: str):
@@ -17,23 +30,49 @@ class GrammarChecker:
         
         # Initialize ChromaDB
         self.client = chromadb.Client()
-        self.collection = self.client.create_collection(
-            name="grammar_corrections",
-            embedding_function=embedding_functions.DefaultEmbeddingFunction()
-        )
+        embed_fn = MyEmbeddingFunction(model)
+        self.collection = self.client.get_or_create_collection(
+          name="grammar_corrections",
+          embedding_function=embed_fn
+)
 
-    def check_grammar(self, sentence: str) -> Dict:
-        system_prompt = """You are a professional English grammar checker. Your task is to:
-1. Identify all grammar errors in the given sentence
-2. Provide the corrected version
-3. Explain each correction in detail
 
-You must respond in JSON format only, with the following structure:
-{
-    "errors": ["error1", "error2", ...],
-    "corrected_sentence": "corrected version",
-    "explanations": ["explanation1", "explanation2", ...]
-}"""
+    def check_grammar(self, sentence: str,n_results:int =3) -> Dict:
+    # 1. 调用你现成的 get_similar_corrections 方法检索相似 correction
+        similar_corrections = self.get_similar_corrections(sentence, n_results)
+
+    # 2. 构造带 RAG 上下文的提示词
+        reference_examples = "\n".join(
+            f"Original: {item['original']} -> Correction: {item['correction']}"
+            for item in similar_corrections
+            ) if similar_corrections else "No similar sentences found."
+        print(reference_examples)
+
+        system_prompt = f"""You are an expert English grammar checker.
+
+            You can refer to the following previous corrections:
+            {reference_examples} if the original sentence and correction content are completely 
+            the same, ONLY return:
+                 {{
+        "errors": ["none"],
+        "corrected_sentence": "corrected version",
+        "explanations": ["correct"]
+                }}
+
+            if they are different,
+
+                then, please:
+            1. Identify all grammar errors in the given sentence.
+            2. Provide the corrected version.
+            3. Explain each correction.
+
+        Respond ONLY in JSON format like:
+            {{
+        "errors": ["error1", "error2"],
+        "corrected_sentence": "corrected version",
+        "explanations": ["explanation1", "explanation2"]
+                }}
+                """
 
         user_prompt = f"Please check the grammar of this sentence: '{sentence}'"
 
@@ -44,7 +83,7 @@ You must respond in JSON format only, with the following structure:
                 {"role": "user", "content": user_prompt}
             ],
             "temperature": 0.3,
-            "max_tokens": 500,
+            "max_tokens": 300,
             "response_format": {"type": "json_object"}
         }
 
@@ -76,6 +115,7 @@ You must respond in JSON format only, with the following structure:
                 metadatas=[{"correction": analysis["corrected_sentence"]}],
                 ids=[f"correction_{len(self.collection.get()['ids']) + 1}"]
             )
+            
 
             return analysis
 
@@ -111,3 +151,9 @@ You must respond in JSON format only, with the following structure:
         except Exception as e:
             print(f"Error retrieving similar corrections: {str(e)}")
             return []
+
+    def get_grammar_qa(self, question: str) -> Dict:
+        system_prompt = """You are a professional English grammar checker. Your task is to:give detailed
+         explanations for the given question.
+        """
+

@@ -20,6 +20,27 @@ def start_recognition(speech_key, service_region):
    
 
     import time
+    import threading
+    import queue
+
+    # 创建一个事件对象用于控制录音
+    recording_event = threading.Event()
+    result_queue = queue.Queue()
+
+    def stop_recording():
+        recording_event.set()
+        speech_recognizer.stop_continuous_recognition()
+        return result_queue.get()
+
+    def start_recording():
+        recording_event.clear()
+        result_queue.queue.clear()
+        speech_recognizer.start_continuous_recognition()
+        
+        while not recording_event.is_set():
+            time.sleep(0.1)
+        
+        return result_text
     try:
         while True:
             time.sleep(1)

@@ -8,6 +8,8 @@ import threading
 import asyncio
 import os
 import speech
+from pydantic import BaseModel
+import requests
 
 app = FastAPI()
 
@@ -24,13 +26,17 @@ app.add_middleware(
 deepinfra_key = "CIKsKJJeHBT4nsqIWKHOXdDdjJEs4O2E"
 speech_key = "6RPQ7KXIBTodcoU17xo0dsdsLKZaXeQgKbMyBbGpaYpqxPcrcpxZJQQJ99BFAC3pKaRXJ3w3AAAYACOGwgQD"
 service_region = "eastasia"
-
+translator_key = "EUb333NFdTqrvbHNznxpzEsNiAfO1Ll7oaUGoNFYGwJBnaPwZD5AJQQJ99BFAC3pKaRXJ3w3AAAbACOG2mX3"
+translator_endpoint = "https://api.cognitive.microsofttranslator.com"
+translator_region = "eastasia"  # 如 eastasia
 # 全局变量
 grammar_checker = GrammarChecker(deepinfra_key)
 recording_event = threading.Event()
 recording_thread = None
 result_text = ""
-
+class TranslationRequest(BaseModel):
+    text: str
+    to_lang: str
 
 def recording_worker():
     global result_text
@@ -146,3 +152,30 @@ async def process_text(request: Request):
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.post("/api/translate")
+def translate_text(request: TranslationRequest):
+    path = '/translate?api-version=3.0'
+    params = f'&to={request.to_lang}'
+    constructed_url = translator_endpoint + path + params
+
+    headers = {
+        'Ocp-Apim-Subscription-Key': translator_key,
+        'Ocp-Apim-Subscription-Region': translator_region,
+        'Content-Type': 'application/json'
+    }
+
+    body = [{
+        'text': request.text
+    }]
+
+    response = requests.post(constructed_url, headers=headers, json=body)
+    result = response.json()
+
+    translation = result[0]['translations'][0]['text']
+
+    return {
+        "original_text": request.text,
+        "translated_text": translation
+    }

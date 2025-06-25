@@ -152,8 +152,38 @@ class GrammarChecker:
             print(f"Error retrieving similar corrections: {str(e)}")
             return []
 
-    def get_grammar_qa(self, question: str) -> Dict:
-        system_prompt = """You are a professional English grammar checker. Your task is to:give detailed
-         explanations for the given question.
-        """
+    def get_grammar_qa(self, question: str) -> dict:
+        # 1. 检索相似问题（可用collection.query）
+        similar_qas = self.collection.query(query_texts=[question], n_results=3)
+        reference_examples = "\n".join(
+            f"Q: {doc} -> A: {meta.get('correction', '')}"
+            for doc, meta in zip(similar_qas["documents"][0], similar_qas["metadatas"][0])
+        ) if similar_qas["documents"][0] else "No similar Q&A found."
+
+        # 2. 构造RAG prompt
+        system_prompt = f"""You are a professional English grammar expert. Please answer the user's grammar question in detail.\n\nYou can refer to the following previous Q&A:\n{reference_examples}\n\nIf the answer is already included above, you can summarize or directly return it. Otherwise, please answer in detail based on your knowledge.\n\nReturn only the answer, do not include any other information."""
+        user_prompt = f"Question: {question}"
+        payload = {
+            "model": "meta-llama/Meta-Llama-3-70B-Instruct",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": 0.3,
+            "max_tokens": 512
+        }
+        try:
+            response = requests.post(self.api_url, headers=self.headers, json=payload)
+            response.raise_for_status()
+            result = response.json()
+            answer = result['choices'][0]['message']['content']
+            # 存入知识库
+            self.collection.add(
+                documents=[question],
+                metadatas=[{"correction": answer}],
+                ids=[f"qa_{len(self.collection.get()['ids']) + 1}"]
+            )
+            return {"answer": answer}
+        except Exception as e:
+            return {"answer": f"Error: {str(e)}"}
 

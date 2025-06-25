@@ -34,9 +34,16 @@ grammar_checker = GrammarChecker(deepinfra_key)
 recording_event = threading.Event()
 recording_thread = None
 result_text = ""
+pronunciation_recording_event = threading.Event()
+pronunciation_thread = None
+pronunciation_result = {}
+
 class TranslationRequest(BaseModel):
     text: str
     to_lang: str
+
+class GrammarQARequest(BaseModel):
+    question: str
 
 def recording_worker():
     global result_text
@@ -59,6 +66,57 @@ def recording_worker():
 
     speech_recognizer.stop_continuous_recognition()
 
+def pronunciation_worker():
+    global pronunciation_result
+    pronunciation_result = {}
+    speech_config = speechsdk.SpeechConfig(subscription=speech_key, region=service_region)
+    audio_config = speechsdk.audio.AudioConfig(use_default_microphone=True)
+    # reference_text设为空，启用自由朗读自动识别
+    reference_text = ""
+    pronunciation_config = speechsdk.PronunciationAssessmentConfig(
+        reference_text=reference_text,
+        grading_system=speechsdk.PronunciationAssessmentGradingSystem.HundredMark,
+        granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme
+    )
+    recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+    pronunciation_scores = []
+    accuracy_scores = []
+    fluency_scores = []
+    completeness_scores = []
+    recognized_texts = []
+    def recognized_callback(evt):
+        result = evt.result
+        if result.reason == speechsdk.ResultReason.RecognizedSpeech:
+            pa_result = speechsdk.PronunciationAssessmentResult(result)
+            pronunciation_scores.append(pa_result.pronunciation_score)
+            accuracy_scores.append(pa_result.accuracy_score)
+            fluency_scores.append(pa_result.fluency_score)
+            completeness_scores.append(pa_result.completeness_score)
+            recognized_texts.append(result.text)
+    recognizer.recognized.connect(recognized_callback)
+    pronunciation_config.apply_to(recognizer)
+    recognizer.start_continuous_recognition()
+    while not pronunciation_recording_event.is_set():
+        import time
+        time.sleep(0.1)
+    recognizer.stop_continuous_recognition()
+    # 取平均分
+    if pronunciation_scores:
+        avg_score = sum(pronunciation_scores) / len(pronunciation_scores)
+        avg_accuracy = sum(accuracy_scores) / len(accuracy_scores)
+        avg_fluency = sum(fluency_scores) / len(fluency_scores)
+        avg_completeness = sum(completeness_scores) / len(completeness_scores)
+        spoken_text = " ".join(recognized_texts)
+        pronunciation_result = {
+            "score": round(avg_score, 2),
+            "accuracy": round(avg_accuracy, 2),
+            "fluency": round(avg_fluency, 2),
+            "completeness": round(avg_completeness, 2),
+            "spoken_text": spoken_text,
+            "feedback": f"You read: '{spoken_text}'.\nScore: {round(avg_score,2)}, Accuracy: {round(avg_accuracy,2)}, Fluency: {round(avg_fluency,2)}, Completeness: {round(avg_completeness,2)}."
+        }
+    else:
+        pronunciation_result = {"score": 0, "feedback": "No speech detected.", "spoken_text": ""}
 
 @app.get("/")
 async def index():
@@ -68,7 +126,9 @@ async def index():
             "/api/speech/start": "POST - 开始录音",
             "/api/speech/stop": "POST - 停止录音",
             "/api/speech/status": "GET - 获取录音状态",
-            "/api/text": "POST - 处理文本输入"
+            "/api/text": "POST - 处理文本输入",
+            "/api/pronunciation/start": "POST - 开始发音录音",
+            "/api/pronunciation/stop": "POST - 停止发音录音"
         }
     }
 
@@ -179,3 +239,31 @@ def translate_text(request: TranslationRequest):
         "original_text": request.text,
         "translated_text": translation
     }
+
+
+@app.post("/api/grammar/qa")
+async def grammar_qa(request: GrammarQARequest):
+    try:
+        result = grammar_checker.get_grammar_qa(request.question)
+        return result
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"answer": f"Error: {str(e)}"})
+
+@app.post("/api/pronunciation/start")
+async def start_pronunciation_recording():
+    global pronunciation_thread, pronunciation_recording_event
+    if pronunciation_thread and pronunciation_thread.is_alive():
+        return JSONResponse(status_code=400, content={"error": "Recording already in progress"})
+    pronunciation_recording_event.clear()
+    pronunciation_thread = threading.Thread(target=pronunciation_worker)
+    pronunciation_thread.start()
+    return {"status": "Pronunciation recording started"}
+
+@app.post("/api/pronunciation/stop")
+async def stop_pronunciation_recording():
+    global pronunciation_thread, pronunciation_recording_event, pronunciation_result
+    if not pronunciation_thread or not pronunciation_thread.is_alive():
+        return JSONResponse(status_code=400, content={"error": "No recording in progress"})
+    pronunciation_recording_event.set()
+    pronunciation_thread.join()
+    return pronunciation_result

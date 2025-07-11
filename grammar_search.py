@@ -6,6 +6,7 @@ import requests
 import json
 from typing import Dict, List
 from sentence_transformers import SentenceTransformer
+# from chromadb.config import Settings
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
@@ -28,19 +29,44 @@ class GrammarChecker:
             "Content-Type": "application/json"
         }
         
-        # Initialize ChromaDB
-        self.client = chromadb.Client()
+        self.client = chromadb.PersistentClient(path="D:/internal project/chroma_storage")
+       
+    
         embed_fn = MyEmbeddingFunction(model)
         self.collection = self.client.get_or_create_collection(
           name="grammar_corrections",
           embedding_function=embed_fn
 )
+       
+#         with open("./grammar_corrections.txt", "r", encoding="utf-8") as f:
+#             lines = [line.strip() for line in f.readlines() if line.strip()]
+
+#             documents = []
+#             metadatas = []
+#             ids = []
+
+#         for idx, line in enumerate(lines):
+#             if '|' in line:
+#                 original, correction = [s.strip() for s in line.split("|")]
+#                 documents.append(original)
+#                 metadatas.append({"correction": correction})
+#                 ids.append(f"correction_{idx+1}")
+        
+        
+#         self.collection.add(
+#             documents=documents,
+#             metadatas=metadatas,
+#             ids=ids
+# )
+
 
 
     def check_grammar(self, sentence: str,n_results:int =3) -> Dict:
     # 1. 调用你现成的 get_similar_corrections 方法检索相似 correction
-        similar_corrections = self.get_similar_corrections(sentence, n_results)
+       
 
+        similar_corrections = self.get_similar_corrections(sentence, n_results)
+        # print(similar_corrections)
     # 2. 构造带 RAG 上下文的提示词
         reference_examples = "\n".join(
             f"Original: {item['original']} -> Correction: {item['correction']}"
@@ -51,7 +77,7 @@ class GrammarChecker:
         system_prompt = f"""You are an expert English grammar checker.
 
             You can refer to the following previous corrections:
-            {reference_examples} if the original sentence and correction content are completely 
+            {reference_examples}.  if the original sentence and correction content are completely 
             the same, ONLY return:
                  {{
         "errors": ["none"],
@@ -92,6 +118,7 @@ class GrammarChecker:
             response.raise_for_status()
 
             result = response.json()
+            # print(result)
             content = result['choices'][0]['message']['content']
 
             # Ensure valid JSON
@@ -110,12 +137,14 @@ class GrammarChecker:
                 raise ValueError("Response missing required fields")
 
             # Store in ChromaDB
-            self.collection.add(
-                documents=[sentence],
-                metadatas=[{"correction": analysis["corrected_sentence"]}],
-                ids=[f"correction_{len(self.collection.get()['ids']) + 1}"]
+            if analysis["explanations"] == ["correct"]:
+                return analysis
+            else:
+                self.collection.add(
+                    documents=[sentence],
+                    metadatas=[{"correction": analysis["corrected_sentence"]}],
+                    ids=[f"correction_{len(self.collection.get()['ids']) + 1}"]
             )
-            
 
             return analysis
 

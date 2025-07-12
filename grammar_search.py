@@ -4,6 +4,7 @@ import chromadb
 from chromadb.utils import embedding_functions
 import requests
 import json
+import sqlite3
 from typing import Dict, List
 from sentence_transformers import SentenceTransformer
 # from chromadb.config import Settings
@@ -38,32 +39,39 @@ class GrammarChecker:
           embedding_function=embed_fn
 )
        
-#         with open("./grammar_corrections.txt", "r", encoding="utf-8") as f:
-#             lines = [line.strip() for line in f.readlines() if line.strip()]
-
-#             documents = []
-#             metadatas = []
-#             ids = []
-
-#         for idx, line in enumerate(lines):
-#             if '|' in line:
-#                 original, correction = [s.strip() for s in line.split("|")]
-#                 documents.append(original)
-#                 metadatas.append({"correction": correction})
-#                 ids.append(f"correction_{idx+1}")
-        
-        
-#         self.collection.add(
-#             documents=documents,
-#             metadatas=metadatas,
-#             ids=ids
-# )
 
 
+    def _log_to_database(self, user_id: int, question: str, correction: str, error_types: List[str]):
+        """记录语法检查结果到数据库"""
+        try:
+            conn = sqlite3.connect("users.db")
+            cursor = conn.cursor()
+            
+            # 将错误类型列表转换为JSON字符串
+            error_types_json = json.dumps(error_types)
+            
+            cursor.execute("""
+                INSERT INTO grammar_logs (user_id, question, correction, error_types, created_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (user_id, question, correction, error_types_json))
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Error logging to database: {str(e)}")
 
-    def check_grammar(self, sentence: str,n_results:int =3) -> Dict:
+    def check_grammar(self, sentence: str, n_results: int = 3, user_id: int = None) -> Dict:
     # 1. 调用你现成的 get_similar_corrections 方法检索相似 correction
-       
+        error_types = {
+            "subject-verb agreement": "The verb should agree with the subject in number and person.",
+            "tense": "Incorrect tense used; choose the correct tense based on the time context.",
+            "article usage": "Incorrect article usage; use 'a', 'an', or 'the' appropriately before nouns.",
+            "preposition": "Incorrect or inappropriate preposition used in the sentence.",
+            "plural form": "Incorrect plural form; missing or incorrect use of plural suffix.",
+            "word order": "Word order error; the sentence structure does not follow natural English syntax.",
+            "pronoun reference": "Unclear or incorrect pronoun reference; the pronoun should clearly refer to a noun.",
+            "comparative/superlative": "Incorrect use of comparative or superlative form based on comparison context."
+}
 
         similar_corrections = self.get_similar_corrections(sentence, n_results)
         # print(similar_corrections)
@@ -82,14 +90,16 @@ class GrammarChecker:
                  {{
         "errors": ["none"],
         "corrected_sentence": "corrected version",
+        
         "explanations": ["correct"]
                 }}
 
             if they are different,
 
                 then, please:
-            1. Identify all grammar errors in the given sentence.
+            1. Identify all grammar errors in the given sentence, referring to {error_types}.
             2. Provide the corrected version.
+            
             3. Explain each correction.
 
         Respond ONLY in JSON format like:
@@ -118,7 +128,7 @@ class GrammarChecker:
             response.raise_for_status()
 
             result = response.json()
-            # print(result)
+            print(result)
             content = result['choices'][0]['message']['content']
 
             # Ensure valid JSON
@@ -136,13 +146,27 @@ class GrammarChecker:
             if not all(key in analysis for key in required_keys):
                 raise ValueError("Response missing required fields")
 
+            # 记录到数据库
+            if user_id is not None:
+                self._log_to_database(
+                    user_id=user_id,
+                    question=sentence,
+                    correction=analysis["corrected_sentence"],
+                    error_types=analysis["errors"]
+                )
+
             # Store in ChromaDB
             if analysis["explanations"] == ["correct"]:
                 return analysis
             else:
+                # 将explanations列表合并为一个字符串
+                explanation_text = " ".join(analysis["explanations"]) if analysis["explanations"] else ""
                 self.collection.add(
                     documents=[sentence],
-                    metadatas=[{"correction": analysis["corrected_sentence"]}],
+                    metadatas=[{
+                        "correction": analysis["corrected_sentence"],
+                        "explanation": explanation_text
+                    }],
                     ids=[f"correction_{len(self.collection.get()['ids']) + 1}"]
             )
 
@@ -170,13 +194,17 @@ class GrammarChecker:
                 n_results=n_results
             )
 
-            return [
-                {
-                    "original": doc,
-                    "correction": meta["correction"]
-                }
-                for doc, meta in zip(results["documents"][0], results["metadatas"][0])
-            ]
+            corrections = []
+            if results["documents"][0] and results["metadatas"][0]:
+                for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
+                    correction = {
+                        "original": doc,
+                        "correction": meta.get("correction", doc),
+                        "explanation": meta.get("explanation", "")
+                    }
+                    corrections.append(correction)
+            
+            return corrections
         except Exception as e:
             print(f"Error retrieving similar corrections: {str(e)}")
             return []
@@ -206,12 +234,8 @@ class GrammarChecker:
             response.raise_for_status()
             result = response.json()
             answer = result['choices'][0]['message']['content']
-            # 存入知识库
-            self.collection.add(
-                documents=[question],
-                metadatas=[{"correction": answer}],
-                ids=[f"qa_{len(self.collection.get()['ids']) + 1}"]
-            )
+         
+            
             return {"answer": answer}
         except Exception as e:
             return {"answer": f"Error: {str(e)}"}

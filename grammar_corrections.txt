@@ -1,49 +1,31 @@
-
-I has a pen. | I have a pen.
-She go to school everyday. | She goes to school every day.
-He don't like apples. | He doesn't like apples.
-They is playing football. | They are playing football.
-This are my books. | These are my books.
-We was happy yesterday. | We were happy yesterday.
-Does he likes pizza? | Does he like pizza?
-I can plays the guitar. | I can play the guitar.
-There is many cars. | There are many cars.
-She were late for class. | She was late for class.
-I didn't went to school. | I didn't go to school.
-He don't knows the answer. | He doesn't know the answer.
-She have two brothers. | She has two brothers.
-He want to eats now. | He wants to eat now.
-I has finished my work. | I have finished my work.
-They doesn't live here. | They don't live here.
-It are raining now. | It is raining now.
-Where is they? | Where are they?
-We was waiting for you. | We were waiting for you.
-I can to swim. | I can swim.
-He don't has a car. | He doesn't have a car.
-She going to the market. | She is going to the market.
-I didn't saw him. | I didn't see him.
-He have been working all day. | He has been working all day.
-Does she knows you? | Does she know you?
-There is five apples. | There are five apples.
-I can plays piano. | I can play piano.
-He going to school. | He is going to school.
-I am agree with you. | I agree with you.
-She has finish her homework. | She has finished her homework.
-We was at the park. | We were at the park.
-He don't like coffee. | He doesn't like coffee.
-You was wrong. | You were wrong.
-He going home now. | He is going home now.
-She are very kind. | She is very kind.
-He don't knows English. | He doesn't know English.
-I have saw that movie. | I have seen that movie.
-He has went home. | He has gone home.
-They is teachers. | They are teachers.
-I was go there yesterday. | I went there yesterday.
-Does he has a pen? | Does he have a pen?
-I has two cats. | I have two cats.
-She don't likes music. | She doesn't like music.
-We was playing football. | We were playing football.
-I didn't eaten lunch. | I didn't eat lunch.
-It are cold today. | It is cold today.
-They doesn't knows the way. | They don't know the way.
-He like pizza very much. | He likes pizza very much.
+ There is many cars.           | There are many cars.           | Subject-verb agreement            | "Cars" is plural, so we use "are" instead of "is" for plural subjects.                       
+ She were late for class.      | She was late for class.        | Subject-verb agreement            | The subject "she" is third person singular, so the correct past tense of "to be" is "was".   
+ He don't knows the answer.    | He doesn't know the answer.    | Subject-verb agreement            | Use "doesn't" for third person singular, and the main verb remains in base form without "s". 
+ She have two brothers.        | She has two brothers.          | Subject-verb agreement            | "She" is third person singular, so the verb should be "has".                                 
+ He want to eats now.          | He wants to eat now.           | Subject-verb agreement, Verb form | "He" is third person singular, so "wants". After "to", the verb must be base form: "eat".    
+ I has finished my work.       | I have finished my work.       | Subject-verb agreement            | "I" uses "have", not "has". "Has" is only for third person singular.                         
+ They doesn't live here.       | They don't live here.          | Subject-verb agreement            | "They" is plural, so use "don't".                                                            
+ It are raining now.           | It is raining now.             | Subject-verb agreement            | "It" is singular, so the correct verb is "is".                                               
+ Where is they?                | Where are they?                | Subject-verb agreement            | "They" is plural, so use "are".                                                              
+ We was waiting for you.       | We were waiting for you.       | Subject-verb agreement            | "We" is plural, so use "were".                                                               
+ I can to swim.                | I can swim.                    | Modal verb rule                   | After "can", the main verb should be base form without "to".                                 
+ He don't has a car.           | He doesn't have a car.         | Subject-verb agreement            | "He" uses "doesn't", and the main verb stays in base form "have".                                        
+ He have been working all day. | He has been working all day.   | Subject-verb agreement            | "He" is third person singular, so use "has".                                                       
+ We was at the park.           | We were at the park.           | Subject-verb agreement            | "We" is plural, so "were".                                                                   
+He don't like coffee.         | He doesn't like coffee.        | Subject-verb agreement            | "He" uses "doesn't", and the verb is base form.                                              
+ You was wrong.                | You were wrong.                | Subject-verb agreement            | "You" uses "were" in both singular and plural forms in past tense.                                                       
+ She are very kind.            | She is very kind.              | Subject-verb agreement            | "She" is singular, so "is".                                                                  
+ He don't knows English.       | He doesn't know English.       | Subject-verb agreement            | "He" uses "doesn't", verb is base form.                                                                                    
+ They is teachers.             | They are teachers.             | Subject-verb agreement            | "They" is plural, so use "are".                                                              
+ I was go there yesterday.     | I went there yesterday.        | Tense error                       | Past simple should be "went", not "was go".                                                                                     
+ I has two cats.               | I have two cats.               | Subject-verb agreement            | "I" uses "have".                                                                             
+ She don't likes music.        | She doesn't like music.        | Subject-verb agreement            | "She" uses "doesn't", verb is base form.                                                     
+ We was playing football.      | We were playing football.      | Subject-verb agreement            | "We" is plural, so use "were".                                                                           
+ It are cold today.            | It is cold today.              | Subject-verb agreement            | "It" is singular, so use "is".                                                               
+ They doesn't knows the way.   | They don't know the way.       | Subject-verb agreement            | "They" is plural, so "don't", and verb is base form.                                         
+He like pizza very much.      | He likes pizza very much.      | Subject-verb agreement            | "He" is third person singular, so verb takes "s".                                            
+ I has a pen.               | I have a pen.                 | Subject-verb agreement               | The subject "I" always takes the verb "have", not "has". "Has" is used with third person singular subjects like "he", "she", or "it".                                                                            
+   She go to school everyday.   | She goes to school every day. | Subject-verb agreement, Word spacing | The subject "she" is third person singular, so the verb should be "goes". Also, "everyday" (one word) is an adjective meaning "ordinary". Here, you need "every day" (two words) as an adverbial phrase of time. 
+   He don't like apples.        | He doesn't like apples.       | Subject-verb agreement               | In present simple negative sentences, "doesn't" is used for third person singular subjects (he, she, it). After "doesn't", the verb remains in base form.                                                        
+   They is playing football.    | They are playing football.    | Subject-verb agreement               | The plural subject "they" must be paired with "are" instead of "is". "Is" is only for singular subjects.                                                                                                         
+ pronoun, while "books" is plural. The correct plural form is "these" when referring to multiple objects nearby.                                                               

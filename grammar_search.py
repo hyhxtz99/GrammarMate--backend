@@ -113,7 +113,8 @@ class GrammarChecker:
         user_prompt = f"Please check the grammar of this sentence: '{sentence}'"
 
         payload = {
-            "model": "meta-llama/Meta-Llama-3-70B-Instruct",
+            # "model": "meta-llama/Meta-Llama-3-70B-Instruct",
+             "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}

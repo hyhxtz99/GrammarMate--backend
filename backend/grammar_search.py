@@ -7,7 +7,12 @@ import json
 import sqlite3
 from typing import Dict, List
 from sentence_transformers import SentenceTransformer
+import os
+from dotenv import load_dotenv
 # from chromadb.config import Settings
+
+# 加载环境变量
+load_dotenv()
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
@@ -30,7 +35,9 @@ class GrammarChecker:
             "Content-Type": "application/json"
         }
         
-        self.client = chromadb.PersistentClient(path="D:/internal project/chroma_storage")
+        # 在App Engine中，使用内存存储而不是持久化存储
+        # 注意：这会导致数据在实例重启时丢失
+        self.client = chromadb.Client()
        
     
         embed_fn = MyEmbeddingFunction(model)
@@ -113,8 +120,8 @@ class GrammarChecker:
         user_prompt = f"Please check the grammar of this sentence: '{sentence}'"
 
         payload = {
-            # "model": "meta-llama/Meta-Llama-3-70B-Instruct",
-             "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+            "model": "meta-llama/Meta-Llama-3-70B-Instruct",
+            #  "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -210,6 +217,27 @@ class GrammarChecker:
             print(f"Error retrieving similar corrections: {str(e)}")
             return []
 
+    def _clean_response(self, text: str) -> str:
+        """清理响应文本，保留段落分隔但移除多余的空白行"""
+        if not text:
+            return text
+        
+        # 移除开头和结尾的空白字符
+        text = text.strip()
+        
+        import re
+        
+        # 将3个或更多连续换行符替换为2个换行符（保留段落分隔）
+        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+        
+        # 将单个换行符替换为空格（保持段落内连续）
+        text = re.sub(r'(?<!\n)\n(?!\n)', ' ', text)
+        
+        # 将多个连续空格替换为单个空格
+        text = re.sub(r' +', ' ', text)
+        
+        return text.strip()
+
     def get_grammar_qa(self, question: str) -> dict:
         # 1. 检索相似问题（可用collection.query）
         similar_qas = self.collection.query(query_texts=[question], n_results=3)
@@ -219,7 +247,11 @@ class GrammarChecker:
         ) if similar_qas["documents"][0] else "No similar Q&A found."
 
         # 2. 构造RAG prompt
-        system_prompt = f"""You are a professional English grammar expert. Please answer the user's grammar question in detail.\n\nYou can refer to the following previous Q&A:\n{reference_examples}\n\nIf the answer is already included above, you can summarize or directly return it. Otherwise, please answer in detail based on your knowledge.\n\nReturn only the answer, do not include any other information."""
+        system_prompt = f"""You are a professional English grammar expert. Answer the user's grammar question concisely in 200-300 words maximum. You can use 2-3 paragraphs for better organization, but avoid excessive blank lines between paragraphs. If the answer is already covered in the reference examples, provide a brief summary. Otherwise, give a detailed but concise explanation based on your knowledge. Return only the answer text, no additional formatting or information.
+
+Reference examples:
+{reference_examples}"""
+        
         user_prompt = f"Question: {question}"
         payload = {
             "model": "meta-llama/Meta-Llama-3-70B-Instruct",
@@ -227,15 +259,17 @@ class GrammarChecker:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            "temperature": 0.3,
-            "max_tokens": 512
+            "temperature": 0.2,
+            "max_tokens": 400
         }
         try:
             response = requests.post(self.api_url, headers=self.headers, json=payload)
             response.raise_for_status()
             result = response.json()
             answer = result['choices'][0]['message']['content']
-         
+            
+            # 清理回答中的多余空白行和空格
+            answer = self._clean_response(answer)
             
             return {"answer": answer}
         except Exception as e:

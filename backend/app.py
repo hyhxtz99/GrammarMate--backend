@@ -14,6 +14,10 @@ import speech
 from pydantic import BaseModel
 import requests
 import json
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 app = FastAPI()
 
@@ -28,20 +32,24 @@ app.add_middleware(
 )
 
 # 配置 Azure Speech 服务
-deepinfra_key = "CIKsKJJeHBT4nsqIWKHOXdDdjJEs4O2E"
-speech_key = "6RPQ7KXIBTodcoU17xo0dsdsLKZaXeQgKbMyBbGpaYpqxPcrcpxZJQQJ99BFAC3pKaRXJ3w3AAAYACOGwgQD"
-service_region = "eastasia"
-translator_key = "EUb333NFdTqrvbHNznxpzEsNiAfO1Ll7oaUGoNFYGwJBnaPwZD5AJQQJ99BFAC3pKaRXJ3w3AAAbACOG2mX3"
-translator_endpoint = "https://api.cognitive.microsofttranslator.com"
-translator_region = "eastasia"  # 如 eastasia
-# 全局变量
-grammar_checker = GrammarChecker(deepinfra_key)
-recording_event = threading.Event()
+deepinfra_key = os.getenv("DEEPINFRA_API_KEY")
+speech_key = os.getenv("AZURE_SPEECH_KEY")
+service_region = os.getenv("AZURE_SPEECH_REGION")
+translator_key = os.getenv("AZURE_TRANSLATOR_KEY")
+translator_endpoint = os.getenv("AZURE_TRANSLATOR_ENDPOINT")
+translator_region = os.getenv("AZURE_TRANSLATOR_REGION")
+# 全局变量 - 注意：在App Engine中，全局变量在实例重启时会重置
+grammar_checker = None
+recording_event =threading.Event()
 recording_thread = None
 result_text = ""
-# pronunciation_recording_event = threading.Event()
-# pronunciation_thread = None
-# pronunciation_result = {}
+
+def get_grammar_checker():
+    global grammar_checker
+    if grammar_checker is None:
+        grammar_checker = GrammarChecker(deepinfra_key)
+    return grammar_checker
+
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -94,8 +102,6 @@ def recording_worker():
     speech_recognizer.stop_continuous_recognition()
     print(f"[DEBUG] recording_worker finished, result_text = {result_text}")
 
-
-
 @app.get("/")
 async def index():
     return {
@@ -107,20 +113,15 @@ async def index():
             "/api/speech/stop": "POST - 停止录音",
             "/api/speech/status": "GET - 获取录音状态",
             "/api/text": "POST - 处理文本输入",
-            # "/api/pronunciation/start": "POST - 开始发音录音",
-            # "/api/pronunciation/stop": "POST - 停止发音录音"
         }
     }
 @app.post("/api/login")
 async def login(data: LoginRequest):
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
-
     cursor.execute("SELECT id, username FROM users WHERE username=? AND password=?", (data.username, data.password))
     user = cursor.fetchone()
-
     conn.close()
-
     if user:
         return {"success": True, "user_id": user[0], "username": user[1]}
     else:
@@ -130,19 +131,16 @@ async def login(data: LoginRequest):
 async def register(data: RegisterRequest):
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
-
     # 检查用户名是否已存在
     cursor.execute("SELECT * FROM users WHERE username=?", (data.username,))
     if cursor.fetchone():
         conn.close()
         return JSONResponse(status_code=400, content={"success": False, "message": "Username already exists"})
-
     # 插入新用户（包含email）
     cursor.execute("INSERT INTO users (username, password, email) VALUES (?, ?, ?)", 
                   (data.username, data.password, data.email))
     conn.commit()
     conn.close()
-
     return {"success": True, "message": "Registration successful"}
 
 @app.post("/api/speech/start")
@@ -176,7 +174,7 @@ async def stop_recording(request: Request):
     except:
         user_id = None
     
-    result = grammar_checker.check_grammar(result_text, user_id=user_id)
+    result = get_grammar_checker().check_grammar(result_text, user_id=user_id)
     
     print(f"[DEBUG] grammar_checker.check_grammar result = {result}")
     return {
@@ -187,42 +185,17 @@ async def stop_recording(request: Request):
         "explanations": result['explanations']
     }
 
-
 @app.get("/api/speech/status")
 async def get_recording_status():
     is_recording = recording_thread is not None and recording_thread.is_alive()
     return {"is_recording": is_recording}
 
-
 @app.post("/api/speech")
 async def speech_to_text(audio: UploadFile = File(...), request: Request = None):
     try:
-        audio_path = "temp_audio.wav"
-        with open(audio_path, "wb") as f:
-            f.write(await audio.read())
-
-        text = speech.start_recognition(speech_key, service_region)
-        
-        # 获取用户ID（如果有的话）
-        user_id = None
-        if request:
-            try:
-                data = await request.json()
-                user_id = data.get('user_id')
-            except:
-                pass
-        
-        result = grammar_checker.check_grammar(text, user_id=user_id)
-        similar = grammar_checker.get_similar_corrections(text)
-
-        if result['error'] == ['none']:
-            os.remove(audio_path)
-            return {
-                "text": result['corrected_sentence'],
-                "grammar_result": result['explanations']
-            }
-        else:
-            return JSONResponse(status_code=400, content={"error": "Speech recognition failed"})
+        # 注意：App Engine不支持本地文件操作，需要使用云存储
+        # 这里简化为直接返回错误，实际部署时需要修改为使用云存储
+        return JSONResponse(status_code=501, content={"error": "File upload not configured for cloud environment"})
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -238,7 +211,7 @@ async def process_text(request: Request):
         if not text:
             return JSONResponse(status_code=400, content={"error": "No text provided"})
 
-        result = grammar_checker.check_grammar(text, user_id=user_id)
+        result = get_grammar_checker().check_grammar(text, user_id=user_id)
       
 
         return {
@@ -257,62 +230,43 @@ async def process_text(request: Request):
 @app.post("/api/translate")
 async def translate_text(request: TranslationRequest):
     try:
-        
-        
         # 构建正确的翻译API URL
         constructed_url = f"{translator_endpoint}/translate?api-version=3.0&to={request.to_lang}"
-        
-
         headers = {
             'Ocp-Apim-Subscription-Key': translator_key,
             'Ocp-Apim-Subscription-Region': translator_region,
             'Content-Type': 'application/json'
         }
-
         body = [{
             'text': request.text
         }]
-        
-       
-
-        response = requests.post(constructed_url, headers=headers, json=body)
-       
-        
+        response = requests.post(constructed_url, headers=headers, json=body) 
         # 检查响应状态
         if response.status_code != 200:
-            
             return JSONResponse(
                 status_code=500, 
                 content={"error": f"Translation API error: {response.status_code} - {response.text}"}
             )
-            
         result = response.json()
-       
-        
         if not result or len(result) == 0:
             return JSONResponse(
                 status_code=500, 
                 content={"error": "No translation result received"}
             )
-
         translation = result[0]['translations'][0]['text']
-       
-
         return {
             "original_text": request.text,
             "translated_text": translation
         }
     except Exception as e:
-        
         import traceback
         traceback.print_exc()  # 打印完整的错误堆栈
         return JSONResponse(status_code=500, content={"error": f"Translation failed: {str(e)}"})
 
-
 @app.post("/api/grammar/qa")
 async def grammar_qa(request: GrammarQARequest):
     try:
-        result = grammar_checker.get_grammar_qa(request.question)
+        result = get_grammar_checker().get_grammar_qa(request.question)
         return result
     except Exception as e:
         return JSONResponse(status_code=500, content={"answer": f"Error: {str(e)}"})
@@ -322,7 +276,6 @@ async def get_grammar_history(user_id: int):
     try:
         conn = sqlite3.connect("users.db")
         cursor = conn.cursor()
-        
         cursor.execute("""
             SELECT question, correction, error_types, created_at 
             FROM grammar_logs 
@@ -333,7 +286,6 @@ async def get_grammar_history(user_id: int):
         
         results = cursor.fetchall()
         conn.close()
-        
         history = []
         for row in results:
             question, correction, error_types_json, created_at = row
@@ -341,7 +293,6 @@ async def get_grammar_history(user_id: int):
                 error_types = json.loads(error_types_json)
             except:
                 error_types = []
-            
             history.append({
                 "question": question,
                 "correction": correction,
@@ -368,7 +319,6 @@ async def get_user_profile(user_id: int):
         
         user = cursor.fetchone()
         conn.close()
-        
         if user:
             return {
                 "username": user[0],
@@ -385,7 +335,6 @@ async def update_user_profile(user_id: int, request: UserProfileRequest):
     try:
         conn = sqlite3.connect("users.db")
         cursor = conn.cursor()
-        
         # 获取当前用户信息
         cursor.execute("""
             SELECT username FROM users WHERE id = ?
@@ -501,7 +450,7 @@ async def get_personalized_exercises(user_id: int, request: PersonalizedExercise
                 
                 # 从ChromaDB查询相关练习
                 for error_type in most_common_errors:
-                    similar_exercises = grammar_checker.get_similar_corrections(error_type, 10)  # 一次多取一些
+                    similar_exercises = get_grammar_checker().get_similar_corrections(error_type, 10)  # 一次多取一些
                     random.shuffle(similar_exercises)
                     for exercise in similar_exercises:
                         if len(exercises) >= exercises_per_error * len(most_common_errors):
@@ -523,7 +472,7 @@ async def get_personalized_exercises(user_id: int, request: PersonalizedExercise
                 for keyword in general_keywords:
                     if remaining_count <= 0:
                         break
-                    general_exercises = grammar_checker.get_similar_corrections(keyword, 10)
+                    general_exercises = get_grammar_checker().get_similar_corrections(keyword, 10)
                     random.shuffle(general_exercises)
                     for exercise in general_exercises:
                         if remaining_count <= 0:

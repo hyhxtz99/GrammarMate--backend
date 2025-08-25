@@ -1,7 +1,10 @@
 # 智能语法纠正系统 (Intelligent Grammar Correction System)
 一个基于AI的智能语法纠正和语言学习平台，集成了语音识别、语法检查、翻译和个性化练习功能。
+
 网站效果demo可在https://www.bilibili.com/video/BV1j9bfzpEfe/?spm_id_from=333.1387.homepage.video_card.click&vd_source=4301d59ff881ef08cadce8c59747ae54 查看；
+
 前端页面代码可在 https://github.com/hyhxtz99/grammarMate-frontend 查看；
+
 前端页面已部署在https://vercel.com/he-yihans-projects/grammar-mate-frontend
 
 ## 🌟 主要功能

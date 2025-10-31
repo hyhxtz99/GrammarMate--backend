@@ -1,0 +1,27 @@
+The choice between "a" and "an" depends on the sound of the word that follows. 
+
+If the word that follows begins with a consonant sound, use "a". For example:
+
+* a cat
+* a dog
+* a house
+* a boy
+
+On the other hand, if the word that follows begins with a vowel sound, use "an". For example:
+
+* an apple
+* an elephant
+* an hour
+* an orange
+
+Note that it's the sound of the word that matters, not the actual spelling. For instance:
+
+* a European (because "European" starts with a "y" sound, which is a consonant sound)
+* an FBI agent (because "FBI" is pronounced "ef-bee-eye", which starts with a vowel sound)
+
+Also, be aware of silent letters. For example:
+
+* an honest man (because the "h" is silent, and the word starts with a vowel sound)
+* a historic event (because the "h" is not silent, and the word starts with a consonant sound)
+
+In general, if you're unsure which one to use, try saying the sentence out loud. If it sounds more natural with "a", use "a". If it sounds more natural with "an", use "an".

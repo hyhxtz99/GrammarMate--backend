@@ -79,6 +79,40 @@ class GrammarChecker:
             "pronoun reference": "Unclear or incorrect pronoun reference; the pronoun should clearly refer to a noun.",
             "comparative/superlative": "Incorrect use of comparative or superlative form based on comparison context."
 }
+        common_rules = {
+            "subject_verb_agreement": {
+                "description": "The verb must agree with the subject in number and person. 'You are' uses 'are' not because 'you' is plural, but because it is second person.",
+                "example": ["I am", "You are", "He/She/It is", "They are"]
+            },
+            "past_vs_present_perfect": {
+                "description": "Use past simple for actions at a definite past time; use present perfect for actions connected to present or indefinite past.",
+                "example": ["I went to the store yesterday.", "I have been to France."]
+            },
+            "articles": {
+                "description": "'a' before consonant sounds, 'an' before vowel sounds, 'the' for specific or previously mentioned nouns.",
+                "example": ["I saw a dog.", "I saw the dog that you mentioned.", "I ate an apple."]
+            },
+            "countable_vs_uncountable": {
+                "description": "Use many/few with countable nouns; much/little with uncountable nouns. Plural nouns take -s.",
+                "example": ["I have many books.", "I have much water."]
+            },
+            "prepositions_of_time_and_place": {
+                "description": "Use different prepositions for time and place: 'at' for specific point, 'on' for day/date, 'in' for month/year/period.",
+                "example": ["at 5 pm", "on Monday", "in September", "at the bus stop", "on the table", "in the room"]
+            },
+            "pronoun_reference": {
+                "description": "A pronoun must clearly refer to a specific noun to avoid ambiguity.",
+                "example": ["John told Peter, 'I am tired.'", "John told Peter that John was tired."]
+            },
+            "verb_forms_after_modals": {
+                "description": "Modals (can, could, will, should, must) are followed by the base form of the verb.",
+                "example": ["She can go now.", "He should study more."]
+            },
+            "conditional_sentences": {
+                "description": "Zero: if + present, present. First: if + present, will + verb. Second: if + past, would + verb.",
+                "example": ["If you heat water, it boils.", "If it rains, I will stay home.", "If I were rich, I would travel the world."]
+            }
+};
 
         similar_corrections = self.get_similar_corrections(sentence, n_results)
         # print(similar_corrections)
@@ -89,7 +123,7 @@ class GrammarChecker:
             ) if similar_corrections else "No similar sentences found."
         print(reference_examples)
 
-        system_prompt = f"""You are an expert English grammar checker.
+        system_prompt = f"""You are an expert English grammar checker. You can refer to {common_rules} and your answer should not conflict with these common rules.
 
             You can refer to the following previous corrections:
             {reference_examples}.  if the original sentence and correction content are completely 
@@ -120,13 +154,13 @@ class GrammarChecker:
         user_prompt = f"Please check the grammar of this sentence: '{sentence}'"
 
         payload = {
-            "model": "meta-llama/Meta-Llama-3-70B-Instruct",
-            #  "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+            # "model": "meta-llama/Meta-Llama-3-70B-Instruct",
+             "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            "temperature": 0.3,
+            "temperature": 0.2,
             "max_tokens": 300,
             "response_format": {"type": "json_object"}
         }
